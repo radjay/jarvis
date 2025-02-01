@@ -5,24 +5,31 @@ import requests
 import openai
 import pvporcupine
 import pyaudio
+from dotenv import load_dotenv
+import uuid
+import threading
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+import argparse
+import json
 
 import soco
-from http_server import audio_server
+import netifaces
+from tts import synthesize_speech_elevenlabs
+from sonos import play_on_sonos
+from playsound import playsound
+
 
 # ========== CONFIGURATIONS ==========
 
 # 1) Your keys (store securely in env variables or a vault)
-openai.api_key = os.environ.get("OPENAI_API_KEY", "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")
-ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY", "sk_08d27e17b5a3ce7e0afacc7efecc73f9f5e5a14b384edc96")
+load_dotenv()
+openai.api_key = os.getenv("OPENAI_API_KEY")
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+DEFAULT_SONOS_SPEAKER_IP = os.getenv("SONOS_SPEAKER_IP")
 
-# 2) Sonos Speaker IP or Name
-SONOS_SPEAKER_IP = "192.168.50.19"  # IP of your Sonos Arc
-# Alternatively, if you know the speaker by name, you can discover with SoCo.discovery
-
-# 3) Porcupine configuration (hotword model for "Hey Jarvis")
-# Download or train a custom Porcupine wake word for "Hey Jarvis".
-# For demonstration, we'll reference a built-in keyword, but you'd need a custom model for the exact phrase "Hey Jarvis".
 porcupine_keyword_paths = ["jarvis_windows.ppn"]  # Example; depends on OS / custom training
+
+CACHE_FILE = "sonos_cache.json"
 
 # ========== HELPER FUNCTIONS ==========
 
@@ -42,7 +49,7 @@ def record_audio(output_filename="input.wav", record_seconds=5, sample_rate=1600
 
     print("Recording...")
     frames = []
-    for i in range(0, int(sample_rate / chunk_size * record_seconds)):
+    for _ in range(int(sample_rate / chunk_size * record_seconds)):
         data = stream.read(chunk_size)
         frames.append(data)
 
@@ -59,14 +66,9 @@ def record_audio(output_filename="input.wav", record_seconds=5, sample_rate=1600
     wf.writeframes(b''.join(frames))
     wf.close()
 
-def transcribe_audio_with_whisper(audio_file_path: str) -> str:
-    """
-    Use OpenAI Whisper API to transcribe the audio.
-    Alternatively, you could run whisper.cpp locally.
-    """
-    audio_file = open(audio_file_path, "rb")
-    print("Transcribing audio via OpenAI Whisper API...")
-    transcript = openai.Audio.transcribe("whisper-1", audio_file)
+    with open(output_filename, "rb") as audio_file:
+        print("Transcribing audio via OpenAI Whisper API...")
+        transcript = openai.Audio.transcribe("whisper-1", audio_file)
     return transcript["text"]
 
 def chat_with_gpt(user_text: str) -> str:
@@ -84,82 +86,73 @@ def chat_with_gpt(user_text: str) -> str:
     reply = response['choices'][0]['message']['content']
     return reply.strip()
 
-def synthesize_speech_elevenlabs(text: str, output_filename="response.mp3", voice_id="IKne3meq5aSn9XLyUdCD"):
-    """Use ElevenLabs TTS to generate an audio file."""
-    import uuid
-    
-    filename = f"{uuid.uuid4()}.mp3"
-    filepath = os.path.join(audio_server.audio_dir, filename)
-    
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-    headers = {
-        "xi-api-key": ELEVENLABS_API_KEY,
-        "Content-Type": "application/json"
-    }
-    data = {
-        "text": text,
-        "voice_settings": {
-            "stability": 0.3,
-            "similarity_boost": 0.8
-        }
-    }
-    print("Generating TTS with ElevenLabs...")
-    response = requests.post(url, headers=headers, json=data)
-    if response.status_code == 200:
-        with open(filepath, "wb") as f:
-            f.write(response.content)
-        print("TTS audio saved to:", filepath)
-        return filename
-    else:
-        raise Exception(f"ElevenLabs TTS failed with status code {response.status_code}: {response.text}")
+def chat_with_o3mini_jarvis(user_text: str) -> str:
+    """
+    Send user_text to the o3-mini API (using OpenAI API) and get a response styled in the voice of Jarvis.
+    """
+    system_prompt = (
+        "You are Jarvis, a witty, calm, and helpful AI assistant with a dry British accent, "
+        "inspired by the AI in the Iron Man movies. Your responses are clever, polite, and always concise."
+    )
+    response = openai.ChatCompletion.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_text},
+        ],
+    )
+    return response.choices[0].message.content.strip()
 
-def play_on_sonos(audio_file_path: str, room_name: str = None):
-    """Play an audio file on Sonos speaker"""
-    sonos_url = audio_server.get_url_for_file(audio_file_path)
-    print(f"Serving audio at: {sonos_url}")
-    
-    try:
-        if room_name:
-            print("Discovering Sonos speakers...")
-            speakers = list(soco.discover())
-            print(f"Found speakers: {[s.player_name for s in speakers]}")
-            speaker = next((s for s in speakers if s.player_name == room_name), None)
-            if not speaker:
-                raise ValueError(f"No Sonos speaker found with room name: {room_name}")
-        else:
-            speaker = soco.SoCo(SONOS_SPEAKER_IP)
-        
-        print(f"Selected speaker: {speaker.player_name} ({speaker.ip_address})")
-        
-        # Test URL accessibility
-        test_response = requests.get(sonos_url)
-        print(f"URL test status: {test_response.status_code}")
-        if test_response.status_code != 200:
-            raise Exception(f"Audio URL not accessible: {sonos_url}")
+def cli_speak(text: str, speaker: str = None):
+    filename = synthesize_speech_elevenlabs(text)
+    play_on_sonos(filename, room_name=speaker)
 
-        was_playing = (speaker.get_current_transport_info()['current_transport_state'] == 'PLAYING')
-        print(f"Speaker was playing: {was_playing}")
-
-        if was_playing:
-            speaker.pause()
-
-        print(f"Sending TTS to Sonos {speaker.player_name}")
-        speaker.play_uri(sonos_url, title="Jarvis TTS")
-        
-        time.sleep(10)
-        
-        if was_playing:
-            speaker.play()
-    except Exception as e:
-        print(f"Error playing on Sonos: {e}")
-        raise
-
-# ========== MAIN LOOP ==========
+def cli_speak_local(text: str):
+    filename = synthesize_speech_elevenlabs(text)
+    # audio file is created in ../audio_cache relative to tts module, but here we expect it under audio_cache/
+    audio_dir = os.path.join(os.path.dirname(__file__), "audio_cache")
+    filepath = os.path.join(audio_dir, filename)
+    print("Playing audio through local speakers:", filepath)
+    playsound(filepath)
 
 def main():
-    test_text = "Hi Zoey, I am Jarvis... I am your new AI assistant."
-    filename = synthesize_speech_elevenlabs(test_text)
-    play_on_sonos(filename, room_name="Living Room")
+    parser = argparse.ArgumentParser(description="Jarvis Assistant")
+    subparsers = parser.add_subparsers(dest="mode")
+
+    # CLI mode: speak
+    speak_parser = subparsers.add_parser("speak", help="Make Jarvis speak a text")
+    speak_parser.add_argument("text", type=str, help="Text for Jarvis to speak")
+    speak_parser.add_argument("--speaker", type=str, help="Target speaker room name", default=None)
+    speak_parser.add_argument("--local", action="store_true", help="Play through local audio system instead of Sonos")
+    
+    # CLI mode: ask
+    ask_parser = subparsers.add_parser("ask", help="Ask Jarvis a question and get a witty response")
+    ask_parser.add_argument("question", type=str, help="The question to ask Jarvis")
+    ask_parser.add_argument("--speaker", type=str, help="Target speaker room name for TTS output", default=None)
+    ask_parser.add_argument("--local", action="store_true", help="Play through local audio system instead of Sonos")
+
+    args = parser.parse_args()
+
+    if args.mode == "speak":
+        if args.local:
+            cli_speak_local(args.text)
+        else:
+            cli_speak(args.text, args.speaker)
+    elif args.mode == "ask":
+        response_text = chat_with_o3mini_jarvis(args.question)
+        print("Jarvis:", response_text)
+        if args.local:
+            cli_speak_local(response_text)
+        else:
+            cli_speak(response_text, args.speaker)
+    else:
+        # Existing default behavior (if any)
+        try:
+            test_text = "Hi Nalu, I am Jarvis... I am your new AI assistant."
+            filename = synthesize_speech_elevenlabs(test_text)
+            play_on_sonos(filename, room_name="Bedroom")
+        except Exception as e:
+            print(f"Error: {e}")
 
 if __name__ == "__main__":
     main()
