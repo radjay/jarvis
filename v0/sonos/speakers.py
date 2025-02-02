@@ -90,24 +90,33 @@ def play_on_sonos(audio_file_path: str, room_name: str = None):
         if test_response.status_code != 200:
             raise Exception(f"Audio URL not accessible: {sonos_url}")
 
-        # Capture current volume and take a snapshot of the speaker state.
+        # Capture current volume and speaker state.
         orig_volume = speaker.volume
-        jarvis_volume = int(os.getenv("JARVIS_VOLUME", "6"))
+        # Calculate a ducked volume (for background). 
+        duck_volume = int(orig_volume * 0.5)  # e.g. 50% of original.
+        print(f"Ducking background volume from {orig_volume} to {duck_volume}")
+
         snap = Snapshot(speaker)
         snap.snapshot()
-        print(f"Setting volume to {jarvis_volume} for Jarvis TTS playback (original volume: {orig_volume})")
-        speaker.volume = jarvis_volume
+        speaker.volume = duck_volume
 
+        # Optional: Pre-amplify your TTS file here so it sounds louder than the ducked background.
         print(f"Sending TTS to Sonos {speaker.player_name}")
-        # Add the TTS audio to the queue and play it.
         speaker.add_uri_to_queue(sonos_url, 0)
         speaker.play_from_queue(0)
 
         while True:
-            transport_state = speaker.get_current_transport_info()['current_transport_state']
-            if transport_state == 'STOPPED':
+            state = speaker.get_current_transport_info()['current_transport_state']
+            if state == 'STOPPED':
                 break
             time.sleep(0.5)
+
+        try:
+            print("Clearing TTS message from queue")
+            speaker.clear_queue()
+        except Exception as e:
+            print("Error clearing queue:", e)
+
     except SoCoUPnPException as e:
         print(f"UPnP error: {e}")
         raise
@@ -119,15 +128,17 @@ def play_on_sonos(audio_file_path: str, room_name: str = None):
             try:
                 print("Restoring original volume")
                 speaker.volume = orig_volume
-            except Exception as vol_err:
-                print(f"Error restoring volume: {vol_err}")
+            except Exception as e:
+                print("Error restoring volume:", e)
         if 'snap' in locals():
             try:
                 print("Restoring previous speaker state")
-                snap.restore(fade=False)
-            except Exception as snap_err:
-                print(f"Error restoring snapshot: {snap_err}")
-        speaker.clear_queue()
+                snap.restore(fade=True)
+                if speaker.get_current_transport_info().get('current_transport_state') != 'PLAYING':
+                    print("Resuming playback")
+                    speaker.play()
+            except Exception as e:
+                print("Error restoring snapshot:", e)
 
 def find_sonos_speakers():
     discovery = soco.discover(timeout=10)
