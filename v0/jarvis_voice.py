@@ -5,7 +5,7 @@ import pyaudio
 import pvporcupine
 from playsound import playsound
 from jarvis import cli_speak_local, cli_speak
-from llm.chat import chat_with_jarvis_session
+from llm.chat import chat_with_jarvis_session, chat_with_jarvis_function_call
 from dotenv import load_dotenv
 import numpy as np
 import argparse
@@ -156,8 +156,8 @@ def voice_mode(device_index=None, use_sonos=False, speaker=None):
 
                 if user_text.strip():
                     print("You said:", user_text)
-                    # Offload the chat API call into a background thread
-                    future = executor.submit(chat_with_jarvis_session, session_id, user_text)
+                    # Use the function-call enabled chat method
+                    future = executor.submit(chat_with_jarvis_function_call, session_id, user_text)
                     try:
                         answer = future.result(timeout=30)
                     except Exception as e:

@@ -2,3 +2,4 @@
 audio_cache/
 __pycache__/
 *.pyc
+v0/logs/
