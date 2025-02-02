@@ -80,7 +80,7 @@ def play_on_sonos(audio_file_path: str, room_name: str = None):
         response = requests.get(sonos_url)
         response.raise_for_status()  # ensure proper HTTP response
     except requests.exceptions.RequestException as err:
-        print(f"Error playing on Sonos: Audio server isn't running")
+        print("Error playing on Sonos: Audio server isn't running")
         return
     print(f"Using audio URL: {sonos_url}")
 
@@ -90,11 +90,16 @@ def play_on_sonos(audio_file_path: str, room_name: str = None):
         if test_response.status_code != 200:
             raise Exception(f"Audio URL not accessible: {sonos_url}")
 
+        # Capture current volume and take a snapshot of the speaker state.
+        orig_volume = speaker.volume
+        jarvis_volume = int(os.getenv("JARVIS_VOLUME", "6"))
         snap = Snapshot(speaker)
         snap.snapshot()
+        print(f"Setting volume to {jarvis_volume} for Jarvis TTS playback (original volume: {orig_volume})")
+        speaker.volume = jarvis_volume
 
         print(f"Sending TTS to Sonos {speaker.player_name}")
-        # speaker.play_uri(sonos_url, title="Jarvis TTS")
+        # Add the TTS audio to the queue and play it.
         speaker.add_uri_to_queue(sonos_url, 0)
         speaker.play_from_queue(0)
 
@@ -103,21 +108,26 @@ def play_on_sonos(audio_file_path: str, room_name: str = None):
             if transport_state == 'STOPPED':
                 break
             time.sleep(0.5)
-
-        # Restore the previous playback state
-        snap.restore(fade=False)
-
-        speaker.clear_queue()
-    
-        
-        # if was_playing:
-        #     speaker.play()
     except SoCoUPnPException as e:
         print(f"UPnP error: {e}")
         raise
     except Exception as e:
         print(f"Error playing on Sonos: {e}")
         raise
+    finally:
+        if 'orig_volume' in locals():
+            try:
+                print("Restoring original volume")
+                speaker.volume = orig_volume
+            except Exception as vol_err:
+                print(f"Error restoring volume: {vol_err}")
+        if 'snap' in locals():
+            try:
+                print("Restoring previous speaker state")
+                snap.restore(fade=False)
+            except Exception as snap_err:
+                print(f"Error restoring snapshot: {snap_err}")
+        speaker.clear_queue()
 
 def find_sonos_speakers():
     discovery = soco.discover(timeout=10)

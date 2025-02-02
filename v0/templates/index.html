@@ -65,7 +65,7 @@
         {% if history|length > 3 %}
           <div id="more-history" style="display: none;">
             {% for item in history[3:] %}
-              <li class="text-sm">
+              <li class="text-xs">
                 <span class="log-date">{{ item.date }}</span>
                 <span class="log-level {{ item.level.lower() }}">{{ item.level }}</span>
                 <span class="log-message">{{ item.message }}</span>

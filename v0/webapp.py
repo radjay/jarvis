@@ -5,7 +5,7 @@ from sonos import play_on_sonos
 from tts import synthesize_speech_elevenlabs
 from sonos.speakers import find_sonos_speakers
 from sonos.cache import load_sonos_cache, save_sonos_cache
-from llm.chat import chat_with_jarvis
+from llm.chat import chat_with_jarvis_session
 from utilities import logger
 
 app = Flask(__name__)
@@ -65,9 +65,10 @@ def index():
             selected_speaker = request.form.get("speaker", "")
             if question:
                 try:
-                    answer = chat_with_jarvis(question)
+                    user_id = request.remote_addr  # Use request IP as user identifier; replace as needed.
+                    answer = chat_with_jarvis_session(user_id, question)
                     if jarvisify:
-                        answer = chat_with_jarvis("Rewrite the following text in Jarvis style: " + answer)
+                        answer = chat_with_jarvis_session(user_id, "Rewrite the following text in Jarvis style: " + answer)
                     filename = synthesize_speech_elevenlabs(answer)
                     play_on_sonos(filename, room_name=selected_speaker)
                     result = f"Jarvis responded: {answer}"
