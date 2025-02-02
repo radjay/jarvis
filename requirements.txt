@@ -1,0 +1,12 @@
+Flask
+python-dotenv
+PyAudio
+pvporcupine
+playsound
+numpy
+openai
+aiohttp
+requests
+SoCo
+netifaces
+zeroconf
