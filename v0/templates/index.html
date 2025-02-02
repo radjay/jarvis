@@ -2,27 +2,118 @@
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sonos Message Sender</title>
+  <!-- Add Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .log-date { color: #a0aec0; margin-right: 0.5rem; }
+    .log-level { font-weight: 600; margin-right: 0.5rem; }
+    .log-level.info { color: #48bb78; }
+    .log-level.error { color: #f56565; }
+    .log-level.warning { color: #ecc94b; }
+    .log-message { color: #2d3748; }
+  </style>
 </head>
-<body>
-  <h1>Send Message to Sonos Speaker</h1>
-  {% if result %}
-    <p>{{ result }}</p>
-  {% endif %}
-  <form method="post">
-    <label for="speaker">Select Speaker:</label>
-    <select name="speaker" id="speaker">
-      {% for speaker in speakers %}
-        <option value="{{ speaker }}" {% if selected_speaker == speaker %}selected{% endif %}>{{ speaker }}</option>
-      {% endfor %}
-    </select>
-    <button type="submit" name="refresh" value="true">Refresh Speakers</button>
-    <br><br>
-    <label for="message">Message / Question:</label><br>
-    <textarea id="message" name="message" rows="4" cols="50"></textarea>
-    <br><br>
-    <button type="submit">Send to Sonos</button>
-    <button type="submit" name="ask" value="true">Ask Jarvis</button>
-  </form>
+<body class="bg-gray-100 p-4 md:p-6">
+  <div class="w-full max-w-md md:max-w-2xl mx-auto bg-white p-4 md:p-6 rounded shadow">
+    <h1 class="text-2xl font-bold mb-4 text-center">Jarvis Web UI</h1>
+    <form method="post" class="space-y-4">
+      <div>
+        <label for="speaker" class="block font-medium mb-1">Select Speaker:</label>
+        <div class="flex items-center space-x-2">
+          <select name="speaker" id="speaker" class="border rounded p-2 flex-grow">
+            {% for speaker in speakers %}
+              <option value="{{ speaker }}" {% if selected_speaker == speaker %}selected{% endif %}>{{ speaker }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" name="refresh" value="true" class="text-gray-500 p-2 rounded hover:bg-blue-600">
+            <i data-lucide="refresh-cw" class="h-4 w-4"></i>
+          </button>
+        </div>
+      </div>
+      <div>
+        <label for="message" class="block font-medium mb-1">Message / Question:</label>
+        <textarea id="message" name="message" rows="4" class="w-full border rounded p-2"></textarea>
+      </div>
+      <div class="flex items-center">
+        <input type="checkbox" id="jarvisify" name="jarvisify" class="form-checkbox">
+        <label for="jarvisify" class="ml-2">Jarvisify your message</label>
+      </div>
+      <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+        <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+          Say Message
+        </button>
+        <button type="submit" name="ask" value="true" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
+          Ask Jarvis
+        </button>
+      </div>
+    </form>
+    <div id="history-section" class="mt-6">
+      <h2 class="text-lg mb-2">History</h2>
+      {% if result %}
+        <div class="mb-4 p-2 bg-green-100 text-green-800 rounded">{{ result }}</div>
+      {% endif %}
+      <ul class="pl-0">
+        {% for item in history[:3] %}
+          <li class="text-xs">
+            <span class="log-date">{{ item.date }}</span>
+            <span class="log-level {{ item.level.lower() }}">{{ item.level }}</span>
+            <span class="log-message">{{ item.message }}</span>
+          </li>
+        {% endfor %}
+        {% if history|length > 3 %}
+          <div id="more-history" style="display: none;">
+            {% for item in history[3:] %}
+              <li class="text-sm">
+                <span class="log-date">{{ item.date }}</span>
+                <span class="log-level {{ item.level.lower() }}">{{ item.level }}</span>
+                <span class="log-message">{{ item.message }}</span>
+              </li>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </ul>
+      {% if history|length > 3 %}
+        <button id="toggle-history" class="mt-2 text-blue-500" onclick="toggleHistory()">Show More</button>
+      {% endif %}
+    </div>
+  </div>
+<script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const speakerSelect = document.getElementById('speaker');
+      const savedSpeaker = localStorage.getItem('selectedSpeaker');
+
+      if (savedSpeaker) {
+        const optionExists = Array.from(speakerSelect.options).some(
+          option => option.value === savedSpeaker
+        );
+        if (optionExists) {
+          speakerSelect.value = savedSpeaker;
+        }
+      }
+
+      speakerSelect.addEventListener('change', () => {
+        localStorage.setItem('selectedSpeaker', speakerSelect.value);
+      });
+    });
+  </script>
+  <script>
+    function toggleHistory() {
+      var more = document.getElementById("more-history");
+      var btn = document.getElementById("toggle-history");
+      if (more.style.display === "none") {
+          more.style.display = "block";
+          btn.textContent = "Show Less";
+      } else {
+          more.style.display = "none";
+          btn.textContent = "Show More";
+      }
+    }
+  </script>
 </body>
 </html> 

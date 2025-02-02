@@ -1,0 +1,5 @@
+2025-02-02 12:25:56 INFO: Spoke message: 'Hello world' on speaker: 'Bedroom' (jarvisify: no)
+2025-02-02 12:26:33 INFO: Spoke message: 'Hello world' on speaker: 'Bedroom' (jarvisify: no)
+2025-02-02 12:29:43 INFO: Spoke message: 'And another' on speaker: 'Bedroom' (jarvisify: no)
+2025-02-02 12:30:35 INFO: Spoke message: 'And another' on speaker: 'Bedroom' (jarvisify: no)
+2025-02-02 12:35:54 INFO: Answered question: 'How long is the drive from Estoril to Coimbra?' with response: 'The drive from Estoril to Coimbra typically takes ...' on speaker: 'Bedroom' (jarvisify: no)

@@ -17,7 +17,7 @@ import netifaces
 from tts import synthesize_speech_elevenlabs
 from sonos import play_on_sonos
 from playsound import playsound
-
+from utilities import logger
 
 # ========== CONFIGURATIONS ==========
 
@@ -106,14 +106,15 @@ def chat_with_o3mini_jarvis(user_text: str) -> str:
 def cli_speak(text: str, speaker: str = None):
     filename = synthesize_speech_elevenlabs(text)
     play_on_sonos(filename, room_name=speaker)
+    logger.info(f"CLI speak: '{text}' on speaker: '{speaker}'")
 
 def cli_speak_local(text: str):
     filename = synthesize_speech_elevenlabs(text)
-    # audio file is created in ../audio_cache relative to tts module, but here we expect it under audio_cache/
     audio_dir = os.path.join(os.path.dirname(__file__), "audio_cache")
     filepath = os.path.join(audio_dir, filename)
     print("Playing audio through local speakers:", filepath)
     playsound(filepath)
+    logger.info(f"CLI speak local: '{text}'")
 
 def main():
     parser = argparse.ArgumentParser(description="Jarvis Assistant")
@@ -141,18 +142,20 @@ def main():
     elif args.mode == "ask":
         response_text = chat_with_o3mini_jarvis(args.question)
         print("Jarvis:", response_text)
+        logger.info(f"CLI ask: Question: '{args.question}' answered with: '{response_text}' on speaker: '{args.speaker}' (local: {args.local})")
         if args.local:
             cli_speak_local(response_text)
         else:
             cli_speak(response_text, args.speaker)
     else:
-        # Existing default behavior (if any)
         try:
             test_text = "Hi Nalu, I am Jarvis... I am your new AI assistant."
             filename = synthesize_speech_elevenlabs(test_text)
             play_on_sonos(filename, room_name="Bedroom")
+            logger.info(f"Default CLI speak: '{test_text}' on speaker: 'Bedroom'")
         except Exception as e:
             print(f"Error: {e}")
+            logger.error(f"Error in default CLI speak: {e}")
 
 if __name__ == "__main__":
     main()
