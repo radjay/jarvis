@@ -11,6 +11,7 @@ import threading
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 import argparse
 import json
+import numpy as np
 
 import soco
 import netifaces
@@ -35,7 +36,7 @@ CACHE_FILE = "sonos_cache.json"
 
 def record_audio(output_filename="input.wav", record_seconds=5, sample_rate=16000, channels=1):
     """
-    Record from the default microphone for record_seconds or until you stop.
+    Record from the default microphone for record_seconds.
     """
     audio_format = pyaudio.paInt16
     chunk_size = 1024
@@ -54,16 +55,30 @@ def record_audio(output_filename="input.wav", record_seconds=5, sample_rate=1600
         frames.append(data)
 
     print("Finished recording.")
-
     stream.stop_stream()
     stream.close()
     p.terminate()
+
+    # Combine frames and compute RMS and peak amplitude
+    audio_data = b"".join(frames)
+    samples = np.frombuffer(audio_data, dtype=np.int16)
+    rms = np.sqrt(np.mean(samples**2))
+    peak = np.max(np.abs(samples))
+    print("Debug: RMS amplitude =", rms, "Peak amplitude =", peak)
+
+    # Adjust thresholds as needed for your environment.
+    rms_threshold = 20    # low but must be exceeded for voice
+    peak_threshold = 500  # voice typically has higher peak values
+
+    if rms < rms_threshold or peak < peak_threshold:
+        print("Recording appears to be silent or just background noise. Skipping transcription.")
+        return ""
 
     wf = wave.open(output_filename, 'wb')
     wf.setnchannels(channels)
     wf.setsampwidth(p.get_sample_size(audio_format))
     wf.setframerate(sample_rate)
-    wf.writeframes(b''.join(frames))
+    wf.writeframes(audio_data)
     wf.close()
 
     with open(output_filename, "rb") as audio_file:
@@ -115,6 +130,111 @@ def cli_speak_local(text: str):
     print("Playing audio through local speakers:", filepath)
     playsound(filepath)
     logger.info(f"CLI speak local: '{text}'")
+
+def voice_mode(device_index=None, use_sonos=False, speaker=None):
+    try:
+        keyword_paths = ["v0/Jarvis_en_mac_v3_0_0.ppn"]
+        access_key = os.getenv("PORCUPINE_ACCESS_KEY")
+        if not access_key:
+            raise Exception("PORCUPINE_ACCESS_KEY not set in environment")
+        porcupine = pvporcupine.create(access_key=access_key, keyword_paths=keyword_paths)
+    except Exception as e:
+        print("Error initializing Porcupine:", e)
+        return
+
+    pa = pyaudio.PyAudio()
+
+    def open_stream():
+        return pa.open(
+            rate=porcupine.sample_rate,
+            channels=1,
+            format=pyaudio.paInt16,
+            input=True,
+            frames_per_buffer=porcupine.frame_length,
+            input_device_index=device_index
+        )
+
+    try:
+        stream = open_stream()
+    except Exception as e:
+        print("Error opening audio stream:", e)
+        porcupine.delete()
+        pa.terminate()
+        return
+
+    print("Voice mode activated. Say the hotword to interact with Jarvis...")
+    session_id = "voice_session"  # persistent session for conversation context
+
+    try:
+        while True:
+            # Poll available frames to avoid blocking on stream.read
+            if stream.get_read_available() < porcupine.frame_length:
+                time.sleep(0.05)
+                continue
+
+            try:
+                pcm = stream.read(porcupine.frame_length, exception_on_overflow=False)
+            except Exception as e:
+                print("Error reading from stream:", e)
+                continue
+
+            pcm = np.frombuffer(pcm, dtype=np.int16)
+            keyword_index = porcupine.process(pcm)
+            if keyword_index >= 0:
+                try:
+                    playsound("./v0/assets/voice/yes.mp3")
+                except Exception as play_err:
+                    print("Error playing confirmation sound:", play_err)
+                print("Hotword detected! Listening for your question...")
+                try:
+                    stream.stop_stream()
+                    stream.close()
+                    user_text = record_audio(record_seconds=5)
+                except Exception as rec_e:
+                    print("Error processing query audio:", rec_e)
+                    user_text = ""
+                try:
+                    stream = open_stream()
+                except Exception as stream_e:
+                    print("Error reopening audio stream:", stream_e)
+                    break
+
+                if user_text.strip():
+                    print("You said:", user_text)
+                    answer = chat_with_jarvis_session(session_id, user_text)
+                    print("Jarvis:", answer)
+                    if use_sonos:
+                        cli_speak(answer, speaker)
+                    else:
+                        cli_speak_local(answer)
+                    while True:
+                        print("Listening for follow-up question (5 seconds)... (remain silent to end conversation)")
+                        followup = record_audio(record_seconds=5)
+                        if followup.strip():
+                            print("You said:", followup)
+                            answer = chat_with_jarvis_session(session_id, followup)
+                            print("Jarvis:", answer)
+                            if use_sonos:
+                                cli_speak(answer, speaker)
+                            else:
+                                cli_speak_local(answer)
+                        else:
+                            print("No follow-up detected. Returning to hotword mode...")
+                            break
+                else:
+                    print("No speech detected.")
+                print("Resuming hotword listening...")
+                time.sleep(1)
+    except KeyboardInterrupt:
+        print("Voice mode terminating...")
+    finally:
+        try:
+            stream.stop_stream()
+            stream.close()
+        except Exception:
+            pass
+        pa.terminate()
+        porcupine.delete()
 
 def main():
     parser = argparse.ArgumentParser(description="Jarvis Assistant")
