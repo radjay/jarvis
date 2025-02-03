@@ -36,6 +36,11 @@
 - **Hotword Detection**: Listen for the "Hey Jarvis" keyword to activate.
 - **Audio Server**: Serve audio files for playback on Sonos.
 
+## Notes
+
+- Make "jarvis" globally available as a command:
+  sudo ln -s /Users/radjay/dev/jarvis/v0/jarvis.py /usr/local/bin/jarvis
+
 ## License
 
 MIT License
