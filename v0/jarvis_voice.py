@@ -20,22 +20,6 @@ import asyncio
 
 load_dotenv()
 
-# New helper to process the query asynchronously.
-def process_user_query(session_id, user_text, use_sonos, speaker):
-    # Get response from chat_api
-    answer = chat_with_jarvis_session(session_id, user_text)
-    # Immediately initiate TTS conversion.
-    tts_filename = synthesize_speech_elevenlabs(answer)
-    # Return both the answer and the TTS filename.
-    return answer, tts_filename
-
-def play_processing_sound():
-    # Pre-generated sound file indicating processing (e.g. "Hold on, please…")
-    try:
-        playsound("v0/assets/voice/processing.mp3")
-    except Exception as e:
-        print("Error playing processing sound:", e)
-
 def voice_mode(device_index=None, use_sonos=False, speaker=None):
     try:
         keyword_paths = ["v0/Jarvis_en_mac_v3_0_0.ppn"]
@@ -60,7 +44,7 @@ def voice_mode(device_index=None, use_sonos=False, speaker=None):
         )
 
     # Record conversation using the same PyAudio instance.
-    def record_conversation(record_seconds=5):
+    def record_conversation(max_duration=30, silence_duration=0.5, silence_threshold=20, silence_ratio=0.3):
         stream_conv = pa.open(
             rate=porcupine.sample_rate,
             channels=1,
@@ -71,25 +55,58 @@ def voice_mode(device_index=None, use_sonos=False, speaker=None):
         )
         print("Recording conversation...")
         frames = []
-        num_chunks = int(porcupine.sample_rate / porcupine.frame_length * record_seconds)
-        for _ in range(num_chunks):
+        silence_counter = 0.0
+        start_time = time.time()
+        frame_interval = porcupine.frame_length / porcupine.sample_rate
+        speech_started = False
+        max_amp = 0.0
+
+        while True:
+            elapsed = time.time() - start_time
+            if elapsed > max_duration:
+                print("Reached maximum recording duration.")
+                break
+
             try:
                 data = stream_conv.read(porcupine.frame_length, exception_on_overflow=False)
             except Exception as e:
                 print("Error during conversation recording:", e)
                 break
+
             frames.append(data)
+            samples = np.frombuffer(data, dtype=np.int16).astype(np.float32)
+            current_rms = np.sqrt(np.mean(samples**2)) if samples.size > 0 else 0.0
+
+            if current_rms >= silence_threshold:
+                speech_started = True
+                if current_rms > max_amp:
+                    max_amp = current_rms
+                silence_counter = 0.0
+            else:
+                if speech_started:
+                    if current_rms < max_amp * silence_ratio:
+                        silence_counter += frame_interval
+                    else:
+                        silence_counter = 0.0
+
+            if speech_started and silence_counter >= silence_duration:
+                print("Silence detected. Ending recording.")
+                break
+
         stream_conv.stop_stream()
         stream_conv.close()
         print("Finished conversation recording.")
+
         audio_data = b"".join(frames)
-        samples = np.frombuffer(audio_data, dtype=np.int16)
-        rms = np.sqrt(np.mean(samples**2)) if samples.size > 0 else 0
-        peak = np.max(np.abs(samples)) if samples.size > 0 else 0
-        print("Debug: Conversation RMS amplitude =", rms, "Peak amplitude =", peak)
-        if rms < 20 or peak < 500:
-            print("Recording appears to be silent or just background noise. Skipping transcription.")
+        samples_all = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32)
+        overall_rms = np.sqrt(np.mean(samples_all**2)) if samples_all.size > 0 else 0.0
+        overall_peak = np.max(np.abs(samples_all)) if samples_all.size > 0 else 0.0
+        print("Debug: Overall RMS =", overall_rms, "Peak =", overall_peak)
+
+        if overall_rms < silence_threshold or overall_peak < 1000:
+            print("Recording appears to be silent. Skipping transcription.")
             return ""
+
         tmp_filename = "conversation.wav"
         wf = wave.open(tmp_filename, 'wb')
         wf.setnchannels(1)
@@ -97,6 +114,7 @@ def voice_mode(device_index=None, use_sonos=False, speaker=None):
         wf.setframerate(porcupine.sample_rate)
         wf.writeframes(audio_data)
         wf.close()
+
         try:
             print("Transcribing conversation audio via OpenAI Whisper API...")
             with open(tmp_filename, "rb") as audio_file:
@@ -137,14 +155,27 @@ def voice_mode(device_index=None, use_sonos=False, speaker=None):
                 try:
                     assets = ["yes.mp3", "eh-huh.mp3", "yes-sir.mp3", "hi-there.mp3"]
                     selected_asset = random.choice(assets)
-                    playsound("v0/assets/voice/" + selected_asset)
+                    if speaker:
+                        import shutil
+                        from sonos import play_on_sonos
+                        # Prepare the asset for Sonos playback by copying it into the audio cache if needed.
+                        assets_dir = os.path.join("v0", "assets", "voice")
+                        audio_cache_dir = os.path.join("v0", "audio_cache")
+                        os.makedirs(audio_cache_dir, exist_ok=True)
+                        asset_path = os.path.join(assets_dir, selected_asset)
+                        cache_path = os.path.join(audio_cache_dir, selected_asset)
+                        if not os.path.exists(cache_path):
+                            shutil.copy(asset_path, cache_path)
+                        play_on_sonos(selected_asset, room_name=speaker)
+                    else:
+                        playsound(os.path.join("v0", "assets", "voice", selected_asset))
                 except Exception as play_err:
                     print("Error playing confirmation sound:", play_err)
                 print("Hotword detected! Listening for your question...")
                 try:
                     stream.stop_stream()
                     stream.close()
-                    user_text = record_conversation(record_seconds=5)
+                    user_text = record_conversation(max_duration=30, silence_duration=0.5, silence_threshold=20)
                 except Exception as rec_e:
                     print("Error processing query audio:", rec_e)
                     user_text = ""
@@ -171,7 +202,7 @@ def voice_mode(device_index=None, use_sonos=False, speaker=None):
                     followup_attempts = 0
                     while followup_attempts < 10:
                         print(f"Listening for follow-up question (5 seconds)... (attempt {followup_attempts+1} of 10)")
-                        followup = record_conversation(record_seconds=5)
+                        followup = record_conversation(max_duration=30, silence_duration=0.5, silence_threshold=20)
                         if followup.strip():
                             followup_attempts = 0
                             print("You said:", followup)

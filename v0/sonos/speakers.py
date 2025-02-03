@@ -92,16 +92,15 @@ def play_on_sonos(audio_file_path: str, room_name: str = None):
 
         # Capture current volume and speaker state.
         orig_volume = speaker.volume
-        # Calculate a ducked volume (for background). 
-        duck_volume = int(orig_volume * 0.5)  # e.g. 50% of original.
-        print(f"Ducking background volume from {orig_volume} to {duck_volume}")
-
+        orig_state = speaker.get_current_transport_info()['current_transport_state']
+        
         snap = Snapshot(speaker)
         snap.snapshot()
-        speaker.volume = duck_volume
 
         # Optional: Pre-amplify your TTS file here so it sounds louder than the ducked background.
         print(f"Sending TTS to Sonos {speaker.player_name}")
+
+        speaker.volume = os.getenv("JARVIS_VOLUME")
         speaker.add_uri_to_queue(sonos_url, 0)
         speaker.play_from_queue(0)
 
@@ -134,7 +133,7 @@ def play_on_sonos(audio_file_path: str, room_name: str = None):
             try:
                 print("Restoring previous speaker state")
                 snap.restore(fade=True)
-                if speaker.get_current_transport_info().get('current_transport_state') != 'PLAYING':
+                if orig_state == 'PLAYING':
                     print("Resuming playback")
                     speaker.play()
             except Exception as e:
