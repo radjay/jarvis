@@ -4,7 +4,7 @@ import traceback
 import pyaudio
 import pvporcupine
 from playsound import playsound
-from jarvis import cli_speak_local, cli_speak
+from tts.speaker import cli_speak_local, cli_speak
 from llm.chat import chat_with_jarvis_session, chat_with_jarvis_function_call
 from dotenv import load_dotenv
 import numpy as np
@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 import uuid
 import aiohttp
 import asyncio
+from config import BASE_DIR
 
 load_dotenv()
 
@@ -159,8 +160,8 @@ def voice_mode(device_index=None, use_sonos=False, speaker=None):
                         import shutil
                         from sonos import play_on_sonos
                         # Prepare the asset for Sonos playback by copying it into the audio cache if needed.
-                        assets_dir = os.path.join("v0", "assets", "voice","activate")
-                        audio_cache_dir = os.path.join("v0", "audio_cache")
+                        assets_dir = os.path.join(BASE_DIR, "v0", "assets", "voice", "activate")
+                        audio_cache_dir = os.path.join(BASE_DIR, "audio_cache")
                         os.makedirs(audio_cache_dir, exist_ok=True)
                         asset_path = os.path.join(assets_dir, selected_asset)
                         cache_path = os.path.join(audio_cache_dir, selected_asset)
@@ -168,7 +169,7 @@ def voice_mode(device_index=None, use_sonos=False, speaker=None):
                             shutil.copy(asset_path, cache_path)
                         play_on_sonos(selected_asset, room_name=speaker)
                     else:
-                        playsound(os.path.join("v0", "assets", "voice", "activate", selected_asset))
+                        playsound(os.path.join(BASE_DIR, "v0","assets", "voice", "activate", selected_asset))
                 except Exception as play_err:
                     print("Error playing confirmation sound:", play_err)
                 print("Hotword detected! Listening for your question...")
@@ -288,7 +289,7 @@ async def synthesize_tts(text: str) -> str:
             if resp.status == 200:
                 audio_content = await resp.read()
                 filename = f"{uuid.uuid4()}.mp3"
-                audio_dir = os.path.join("audio_cache")
+                audio_dir = os.path.join(BASE_DIR, "audio_cache")
                 os.makedirs(audio_dir, exist_ok=True)
                 filepath = os.path.join(audio_dir, filename)
                 with open(filepath, "wb") as f:

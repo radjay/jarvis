@@ -74,13 +74,14 @@ def play_on_sonos(audio_file_path: str, room_name: str = None):
     print(f"Selected speaker: {speaker.player_name} ({speaker.ip_address})")
 
     local_ip = get_local_ip()
-    sonos_url = f"http://{local_ip}:8009/v0/audio_cache/{audio_file_path}"
+    sonos_url = f"http://{local_ip}:8009/audio_cache/{audio_file_path}"
 
     try:
         response = requests.get(sonos_url)
         response.raise_for_status()  # ensure proper HTTP response
     except requests.exceptions.RequestException as err:
         print("Error playing on Sonos: Audio server isn't running")
+        print(audio_file_path)
         return
     print(f"Using audio URL: {sonos_url}")
 
