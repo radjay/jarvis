@@ -153,13 +153,13 @@ def voice_mode(device_index=None, use_sonos=False, speaker=None):
             keyword_index = porcupine.process(pcm)
             if keyword_index >= 0:
                 try:
-                    assets = ["yes.mp3", "eh-huh.mp3", "yes-sir.mp3", "hi-there.mp3"]
+                    assets = ["welcome-back.mp3", "goodday.mp3", "greetings.mp3", "listening.mp3", "right-here.mp3", "yes-sir.mp3"]
                     selected_asset = random.choice(assets)
                     if speaker:
                         import shutil
                         from sonos import play_on_sonos
                         # Prepare the asset for Sonos playback by copying it into the audio cache if needed.
-                        assets_dir = os.path.join("v0", "assets", "voice")
+                        assets_dir = os.path.join("v0", "assets", "voice","activate")
                         audio_cache_dir = os.path.join("v0", "audio_cache")
                         os.makedirs(audio_cache_dir, exist_ok=True)
                         asset_path = os.path.join(assets_dir, selected_asset)
@@ -168,7 +168,7 @@ def voice_mode(device_index=None, use_sonos=False, speaker=None):
                             shutil.copy(asset_path, cache_path)
                         play_on_sonos(selected_asset, room_name=speaker)
                     else:
-                        playsound(os.path.join("v0", "assets", "voice", selected_asset))
+                        playsound(os.path.join("v0", "assets", "voice", "activate", selected_asset))
                 except Exception as play_err:
                     print("Error playing confirmation sound:", play_err)
                 print("Hotword detected! Listening for your question...")
