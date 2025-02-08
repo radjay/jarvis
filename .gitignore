@@ -4,4 +4,4 @@ __pycache__/
 *.pyc
 v0/logs/
 venv/
-v0/integrations/client_secret.jsonv0/integrations/client_secret.json
+v0/integrations/client_secret.json
