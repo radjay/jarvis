@@ -19,6 +19,7 @@ import aiohttp
 import asyncio
 from config import BASE_DIR
 import platform
+import subprocess
 
 load_dotenv()
 
@@ -178,7 +179,11 @@ def voice_mode(device_index=None, use_sonos=False, speaker=None):
                             shutil.copy(asset_path, cache_path)
                         play_on_sonos(selected_asset, room_name=speaker)
                     else:
-                        playsound(os.path.join(BASE_DIR, "v0","assets", "voice", "activate", selected_asset))
+                        sound_filepath = os.path.join(BASE_DIR, "v0", "assets", "voice", "activate", selected_asset)
+                        if platform.system() == "Darwin":
+                            subprocess.call(["afplay", sound_filepath])
+                        else:
+                            playsound(sound_filepath)
                 except Exception as play_err:
                     print("Error playing confirmation sound:", play_err)
                 print("Hotword detected! Listening for your question...")

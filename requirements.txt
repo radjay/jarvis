@@ -1,14 +1,21 @@
-aiohttp==3.11.11
+# Core dependencies
+numpy
+requests
+aiohttp
+python-dotenv
+
+# Audio and TTS dependencies
+pyaudio
+pyobjc
+playsound
+
+# Additional libraries
+pvporcupine
+soco
+
 Flask==3.1.0
 netifaces==0.11.0
-numpy==2.2.2
 openai==0.28.0
-playsound==1.2.2
-pvporcupine==3.0.4
-PyAudio==0.2.14
-python-dotenv==1.0.1
-requests==2.32.3
-soco==0.30.8
 zeroconf==0.143.0
 supabase==2.13.0
 google-auth==2.20.0

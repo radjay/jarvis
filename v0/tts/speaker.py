@@ -1,4 +1,6 @@
 import os
+import platform
+import subprocess
 from playsound import playsound
 from sonos import play_on_sonos
 from tts.elevenlabs_tts import synthesize_speech_elevenlabs
@@ -21,7 +23,10 @@ def cli_speak_local(text: str, filename: str = None):
     audio_path = os.path.join(BASE_DIR, "audio_cache", filename)
     try:
         if os.path.exists(audio_path):
-            playsound(audio_path)
+            if platform.system() == "Darwin":
+                subprocess.call(["afplay", audio_path])
+            else:
+                playsound(audio_path)
         else:
             logger.error(f"Audio file not found: {audio_path}")
             print(f"Error: Audio file not found: {audio_path}")

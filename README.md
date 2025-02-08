@@ -8,17 +8,29 @@
 
 2. **Environment Variables**
 
-   Create a `.env` file with the following:
+   Create a `.env` file in your project root with the following:
 
    ```
    OPENAI_API_KEY=your_openai_api_key
    ELEVENLABS_API_KEY=your_elevenlabs_api_key
+   PORCUPINE_ACCESS_KEY=your_porcupine_access_key
    SONOS_SPEAKER_IP=your_default_sonos_ip
    SUPABASE_URL=your_supabase_url
    SUPABASE_KEY=your_supabase_anon_key
    ```
 
-3. **Running the Assistant**
+3. **Virtual Environment (Optional but Recommended)**
+
+   Create and activate a virtual environment:
+
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+   _(For automatic activation, consider using [direnv](https://direnv.net/).)_
+
+4. **Running the Assistant**
 
    - **CLI Mode**
 
@@ -26,12 +38,12 @@
      python jarvis.py speak "Hello, world!" --speaker "Living Room"
      ```
 
-   - **Listen Mode**
+   - **Voice Mode**
      ```bash
-     python _listen-for-jarvis.py
+     python jarvis.py voice --speaker "Living Room"
      ```
 
-4. **Supabase Configuration**
+5. **Supabase Configuration**
 
    - **Environment Variables**
 
