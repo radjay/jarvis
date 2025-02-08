@@ -5,3 +5,4 @@ __pycache__/
 v0/logs/
 venv/
 v0/integrations/client_secret.json
+.DS_Store
