@@ -18,12 +18,21 @@ import uuid
 import aiohttp
 import asyncio
 from config import BASE_DIR
+import platform
 
 load_dotenv()
 
 def voice_mode(device_index=None, use_sonos=False, speaker=None):
     try:
-        keyword_paths = ["v0/Jarvis_en_mac_v3_0_0.ppn"]
+        print(f"System: {platform.system()}")
+        print(f"Machine: {platform.machine()}")
+        print(f"Access key length: {len(os.getenv('PORCUPINE_ACCESS_KEY', ''))}")
+        
+        keyword_file = "v0/Jarvis_en_mac_v3_0_0.ppn"
+        print(f"Keyword file exists: {os.path.exists(keyword_file)}")
+        print(f"Keyword file absolute path: {os.path.abspath(keyword_file)}")
+        
+        keyword_paths = [keyword_file]
         access_key = os.getenv("PORCUPINE_ACCESS_KEY")
         if not access_key:
             raise Exception("PORCUPINE_ACCESS_KEY not set in environment")
