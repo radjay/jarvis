@@ -7,6 +7,10 @@ playsound==1.2.2
 pvporcupine==3.0.4
 PyAudio==0.2.14
 python-dotenv==1.0.1
-Requests==2.32.3
+requests==2.32.3
 soco==0.30.8
 zeroconf==0.143.0
+supabase==2.13.0
+google-auth==2.20.0
+google-auth-oauthlib==0.8.0
+google-api-python-client==2.68.0

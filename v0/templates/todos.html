@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Manage Todos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100 p-4">
+    <div class="max-w-md mx-auto bg-white p-6 rounded shadow">
+      <h1 class="text-2xl font-bold mb-4">Todos</h1>
+      <form method="post" class="mb-4">
+        <input
+          type="text"
+          name="task"
+          placeholder="New task"
+          class="w-full border p-2 rounded"
+          required
+        />
+        <button
+          type="submit"
+          class="mt-2 bg-blue-500 text-white px-4 py-2 rounded"
+        >
+          Add Todo
+        </button>
+      </form>
+      <ul>
+        {% for todo in todos %}
+        <li class="flex items-center justify-between mb-2">
+          <form
+            method="post"
+            action="{{ url_for('update_todo_route', todo_id=todo.id) }}"
+            class="flex items-center"
+          >
+            <input
+              type="checkbox"
+              name="completed"
+              {%
+              if
+              todo.completed
+              %}checked{%
+              endif
+              %}
+              onchange="this.form.submit()"
+              class="mr-2"
+            />
+            <span
+              class="{{ 'line-through text-gray-500' if todo.completed else '' }}"
+              >{{ todo.task }}</span
+            >
+          </form>
+          <form
+            method="post"
+            action="{{ url_for('delete_todo_route', todo_id=todo.id) }}"
+          >
+            <button type="submit" class="text-red-500">Delete</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      <a href="{{ url_for('index') }}" class="text-blue-500 mt-4 block"
+        >Back to Home</a
+      >
+    </div>
+  </body>
+</html>

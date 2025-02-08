@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Manage Messages</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100 p-4">
+    <div class="max-w-lg mx-auto bg-white p-6 rounded shadow">
+      <h1 class="text-2xl font-bold mb-4">Messages/Emails</h1>
+      <form method="post" class="mb-4">
+        <input
+          type="text"
+          name="subject"
+          placeholder="Subject"
+          class="w-full border p-2 rounded mb-2"
+          required
+        />
+        <textarea
+          name="body"
+          placeholder="Body"
+          class="w-full border p-2 rounded mb-2"
+          required
+        ></textarea>
+        <button
+          type="submit"
+          class="bg-indigo-500 text-white px-4 py-2 rounded"
+        >
+          Add Message
+        </button>
+      </form>
+      <ul>
+        {% for message in messages %}
+        <li class="mb-4">
+          <form
+            method="post"
+            action="{{ url_for('update_message_route', message_id=message.id) }}"
+            class="mb-2"
+          >
+            <input
+              type="text"
+              name="subject"
+              value="{{ message.subject }}"
+              class="w-full border p-2 rounded mb-1"
+            />
+            <textarea name="body" class="w-full border p-2 rounded mb-1">
+{{ message.body }}</textarea
+            >
+            <div class="flex items-center mb-1">
+              <input
+                type="checkbox"
+                name="sent"
+                {%
+                if
+                message.sent
+                %}checked{%
+                endif
+                %}
+                onchange="this.form.submit()"
+                class="mr-2"
+              />
+              <span>Sent</span>
+            </div>
+            <button
+              type="submit"
+              class="bg-yellow-500 text-white px-4 py-2 rounded"
+            >
+              Update
+            </button>
+          </form>
+          <form
+            method="post"
+            action="{{ url_for('delete_message_route', message_id=message.id) }}"
+          >
+            <button type="submit" class="text-red-500">Delete Message</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      <a href="{{ url_for('index') }}" class="text-blue-500 mt-4 block"
+        >Back to Home</a
+      >
+    </div>
+  </body>
+</html>

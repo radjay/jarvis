@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Edit Calendar Event</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100 p-4">
+    <div class="max-w-lg mx-auto bg-white p-6 rounded shadow">
+      <h1 class="text-2xl font-bold mb-4">Edit Event</h1>
+      <form method="post" class="mb-4">
+        <input
+          type="text"
+          name="title"
+          placeholder="Event title"
+          class="w-full border p-2 rounded mb-2"
+          value="{{ event.title }}"
+          required
+        />
+        <input
+          type="date"
+          name="event_date"
+          class="w-full border p-2 rounded mb-2"
+          value="{{ event.event_date }}"
+          required
+        />
+        <input
+          type="time"
+          name="start_time"
+          class="w-full border p-2 rounded mb-2"
+          value="{{ event.start_time }}"
+          {%
+          if
+          event.all_day
+          %}
+          disabled
+          {%
+          endif
+          %}
+        />
+        <input
+          type="time"
+          name="end_time"
+          class="w-full border p-2 rounded mb-2"
+          value="{{ event.end_time }}"
+          {%
+          if
+          event.all_day
+          %}
+          disabled
+          {%
+          endif
+          %}
+        />
+        <div class="flex items-center mb-2">
+          <input
+            type="checkbox"
+            id="all_day"
+            name="all_day"
+            class="form-checkbox mr-2"
+            {%
+            if
+            event.all_day
+            %}checked{%
+            endif
+            %}
+          />
+          <label for="all_day">All Day</label>
+        </div>
+        <textarea
+          name="description"
+          placeholder="Description (optional)"
+          class="w-full border p-2 rounded mb-2"
+        >
+{{ event.description }}</textarea
+        >
+        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">
+          Update Event
+        </button>
+      </form>
+      <a href="{{ url_for('manage_calendar') }}" class="text-blue-500"
+        >Back to Calendar</a
+      >
+    </div>
+    <script>
+      const allDayCheckbox = document.getElementById("all_day");
+      const startTime = document.querySelector('input[name="start_time"]');
+      const endTime = document.querySelector('input[name="end_time"]');
+
+      allDayCheckbox.addEventListener("change", function () {
+        if (this.checked) {
+          startTime.disabled = true;
+          endTime.disabled = true;
+        } else {
+          startTime.disabled = false;
+          endTime.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

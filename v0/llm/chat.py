@@ -49,6 +49,7 @@ def chat_with_jarvis_session(user_id: str, user_text: str) -> str:
         messages=conversation
     )
     assistant_reply = response.choices[0].message.content.strip()
+    print(f"[LOG] Assistant Response: {assistant_reply}; No function call occurred.")
     
     conversation.append({"role": "assistant", "content": assistant_reply})
     conversation_sessions[user_id] = {"messages": conversation, "last_activity": now}
@@ -83,6 +84,39 @@ def chat_with_jarvis_function_call(user_id: str, user_text: str) -> str:
             "description": "Opens the garage door.",
             "parameters": {"type": "object", "properties": {}},
         },
+        {
+            "name": "get_tasks",
+            "description": "Retrieve a list of tasks or todos.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+        {
+            "name": "create_task",
+            "description": "Create a new task or todo with the provided description.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task": {
+                        "type": "string",
+                        "description": "The description of the new task"
+                    }
+                },
+                "required": ["task"]
+            },
+        },
+        {
+            "name": "mark_task_done",
+            "description": "Mark a task as done using a snippet of its description.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task": {
+                        "type": "string",
+                        "description": "A snippet of the task description to mark as done."
+                    }
+                },
+                "required": ["task"]
+            },
+        },
     ]
     
     response = openai.ChatCompletion.create(
@@ -95,6 +129,7 @@ def chat_with_jarvis_function_call(user_id: str, user_text: str) -> str:
     message = response.choices[0].message
     
     if message.get("function_call"):
+        print(f"[LOG] Function call requested: {message['function_call']}")
         from actions import dispatch_function_call
         result = dispatch_function_call(message["function_call"])
         conversation.append({
@@ -102,15 +137,22 @@ def chat_with_jarvis_function_call(user_id: str, user_text: str) -> str:
             "name": message["function_call"]["name"],
             "content": result
         })
+        # Insert a hidden system update that instructs Jarvis to acknowledge the result.
+        conversation.append({
+            "role": "system",
+            "content": f"The action '{message['function_call']['name']}' was executed successfully with result: {result}. Please ensure your final response reflects this."
+        })
         second_response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
             messages=conversation
         )
         final_message = second_response.choices[0].message.content.strip()
         conversation.append({"role": "assistant", "content": final_message})
+        print(f"[LOG] Final Response after function call: {final_message}")
     else:
         final_message = message.content.strip()
         conversation.append({"role": "assistant", "content": final_message})
+        print(f"[LOG] Assistant Response (plain text): {final_message}")
     
     conversation_sessions[user_id] = {"messages": conversation, "last_activity": now}
     return final_message

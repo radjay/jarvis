@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Chat with Jarvis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="p-4">
+    <div id="chat-container" class="max-w-2xl mx-auto">
+      <div id="chat-messages" class="space-y-2">
+        {% for msg in conversation %} {% if msg.role == 'assistant' %}
+        <div class="flex justify-start">
+          <div class="text-gray-800 p-3 rounded-lg max-w-[75%]">
+            <strong class="text-[9px] text-gray-400 block mb-1">JARVIS</strong>
+            <span>{{ msg.content }}</span>
+          </div>
+        </div>
+        {% else %}
+        <div class="flex justify-end">
+          <div class="bg-green-100 text-gray-800 p-3 rounded-xl max-w-[75%]">
+            <span>{{ msg.content }}</span>
+          </div>
+        </div>
+        {% endif %} {% endfor %}
+      </div>
+      <form id="chat-form" class="mt-4">
+        <input
+          id="message"
+          name="message"
+          type="text"
+          class="w-full border rounded px-2 py-1"
+          placeholder="Type your message..."
+        />
+        <button
+          type="submit"
+          class="mt-2 bg-blue-500 text-white px-4 py-2 rounded"
+        >
+          Send
+        </button>
+      </form>
+    </div>
+    <script>
+      function typeEffect(element, text, delay) {
+        let i = 0;
+        function typing() {
+          if (i < text.length) {
+            element.innerHTML += text.charAt(i);
+            i++;
+            setTimeout(typing, delay);
+          }
+        }
+        typing();
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        const inputField = document.getElementById("message");
+        inputField.focus();
+
+        document
+          .getElementById("chat-form")
+          .addEventListener("submit", function (e) {
+            e.preventDefault();
+            const message = inputField.value.trim();
+            if (!message) return;
+
+            // Append the user message immediately.
+            const chatMessages = document.getElementById("chat-messages");
+            const userDiv = document.createElement("div");
+            userDiv.classList.add("flex", "justify-end");
+            userDiv.innerHTML = `
+            <div class="bg-green-100 text-gray-800 p-3 rounded-lg max-w-[75%]">
+              <strong>You:</strong> <span>${message}</span>
+            </div>
+          `;
+            chatMessages.appendChild(userDiv);
+
+            // Clear the input field and refocus.
+            inputField.value = "";
+            inputField.focus();
+
+            // Send the message via AJAX.
+            const formData = new FormData();
+            formData.append("message", message);
+
+            fetch("/chat_ajax", { method: "POST", body: formData })
+              .then((response) => response.json())
+              .then((data) => {
+                if (data.new_message) {
+                  const assistantDiv = document.createElement("div");
+                  assistantDiv.classList.add("flex", "justify-start");
+                  assistantDiv.innerHTML = `
+                  <div class="bg-blue-100 text-gray-800 p-3 rounded-lg max-w-[75%]">
+                    <strong>Jarvis:</strong> <span class="typed" data-full-text='${data.new_message.content.replace(
+                      /'/g,
+                      "&apos;"
+                    )}'> </span>
+                  </div>
+                `;
+                  chatMessages.appendChild(assistantDiv);
+                  const span = assistantDiv.querySelector(".typed");
+                  span.innerHTML = "";
+                  typeEffect(span, data.new_message.content, 25);
+                } else if (data.error) {
+                  console.error("Error: " + data.error);
+                }
+              })
+              .catch((err) => console.error(err));
+          });
+      });
+    </script>
+  </body>
+</html>
