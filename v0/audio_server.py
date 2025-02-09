@@ -116,10 +116,14 @@ class AudioServer:
                     except Exception as e:
                         print(f"Error playing audio: {e}")
                 # Broadcast to all subscribers
-                for sub in self.subscribers:
+                for sub in self.subscribers[:]:
                     try:
                         sub.sendall(data)
+                    except BrokenPipeError:
+                        # Subscriber disconnected; remove silently.
+                        self.subscribers.remove(sub)
                     except Exception as e:
+                        # Log other errors.
                         print(f"Error sending to subscriber: {e}")
             print(f"Publisher disconnected {address}")
         except Exception as e:
