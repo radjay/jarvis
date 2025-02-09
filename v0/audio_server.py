@@ -37,6 +37,9 @@ class AudioServer:
         self.stream_server = None
         self.threads = []
         
+        self.publishers = []
+        self.subscribers = []
+        
     def start(self):
         if self.mode in [AudioMode.FILE, AudioMode.BOTH]:
             self._start_file_server()
@@ -84,34 +87,60 @@ class AudioServer:
         try:
             while True:
                 client_socket, address = self.stream_server.accept()
-                client_thread = threading.Thread(
-                    target=self._handle_client,
-                    args=(client_socket, address)
-                )
-                client_thread.daemon = True
-                client_thread.start()
-                self.threads.append(client_thread)
+                # Read role marker (3 bytes)
+                role = client_socket.recv(3)
+                if role == b"PUB":
+                    print(f"Publisher connected from {address}")
+                    self.publishers.append(client_socket)
+                    threading.Thread(target=self._handle_publisher, args=(client_socket, address), daemon=True).start()
+                elif role == b"SUB":
+                    print(f"Subscriber connected from {address}")
+                    self.subscribers.append(client_socket)
+                    threading.Thread(target=self._handle_subscriber, args=(client_socket, address), daemon=True).start()
+                else:
+                    print(f"Unknown role from {address}, closing connection")
+                    client_socket.close()
         except Exception as e:
             print(f"Server error: {str(e)}")
             
-    def _handle_client(self, client_socket, address):
-        print(f"New connection from {address}")
-        self.clients.append(client_socket)
-        
+    def _handle_publisher(self, client_socket, address):
         try:
             while True:
                 data = client_socket.recv(self.CHUNK * 2)
                 if not data:
                     break
-                    
+                # Write to local audio output if playback is enabled
                 if self.play_audio and self.output_stream:
-                    self.output_stream.write(data)
+                    try:
+                        self.output_stream.write(data)
+                    except Exception as e:
+                        print(f"Error playing audio: {e}")
+                # Broadcast to all subscribers
+                for sub in self.subscribers:
+                    try:
+                        sub.sendall(data)
+                    except Exception as e:
+                        print(f"Error sending to subscriber: {e}")
+            print(f"Publisher disconnected {address}")
         except Exception as e:
-            print(f"Error handling client {address}: {str(e)}")
+            print(f"Error handling publisher {address}: {e}")
         finally:
+            if client_socket in self.publishers:
+                self.publishers.remove(client_socket)
             client_socket.close()
-            self.clients.remove(client_socket)
-            print(f"Connection from {address} closed")
+            
+    def _handle_subscriber(self, client_socket, address):
+        try:
+            while True:
+                # Just keep the connection alive so broadcasts can be sent.
+                time.sleep(1)
+        except Exception as e:
+            print(f"Error in subscriber {address}: {e}")
+        finally:
+            if client_socket in self.subscribers:
+                self.subscribers.remove(client_socket)
+            client_socket.close()
+            print(f"Subscriber {address} disconnected")
             
     def _handle_keyboard_input(self):
         while True:
