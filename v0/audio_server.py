@@ -23,8 +23,8 @@ class AudioServer:
         os.makedirs(self.audio_dir, exist_ok=True)
         
         # Stream mode settings
-        self.CHUNK = 1024
-        self.FORMAT = pyaudio.paFloat32
+        self.CHUNK = 4096
+        self.FORMAT = pyaudio.paInt16
         self.CHANNELS = 1
         self.RATE = 44100
         self.clients = []
@@ -100,7 +100,7 @@ class AudioServer:
         
         try:
             while True:
-                data = client_socket.recv(self.CHUNK * 4)
+                data = client_socket.recv(self.CHUNK * 2)
                 if not data:
                     break
                     
